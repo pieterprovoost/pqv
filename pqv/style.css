@@ -1,0 +1,12 @@
+#buttons {
+    width: 100%;
+    height: 3;
+}
+
+#info {
+    width: 100%;
+    content-align: center middle;
+    background: $accent;
+    color: $text;
+    dock: top;
+}
