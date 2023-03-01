@@ -14,6 +14,7 @@ class ParquetApp(App[str]):
         ("q", "quit", "Quit"),
         ("←", "previous", "Previous"),
         ("→", "next", "Next"),
+        ("s", "schema", "Schema"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -38,6 +39,16 @@ class ParquetApp(App[str]):
         syntax = Syntax(row, "json", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
         json_view.update(syntax)
 
+    def toggle_schema(self):
+        if self.schema is None:
+            json_view = self.query_one("#json", Static)
+            self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
+            syntax = Syntax(self.schema, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            json_view.update(syntax)
+        else:
+            self.schema = None
+            self.show_row()
+
     def previous(self):
         self.row_index = self.row_index - 1 if self.row_index > 0 else 0
         if self.row_index < self.group_offset:
@@ -60,6 +71,8 @@ class ParquetApp(App[str]):
             self.previous()
         elif event.key == "right":
             self.next()
+        elif event.key == "s":
+            self.toggle_schema()
 
     def on_mount(self) -> None:
         self.group = None
@@ -68,6 +81,7 @@ class ParquetApp(App[str]):
         self.row_index = 0
         self.file_path = sys.argv[1]
         self.parquet_file = ParquetFile(os.path.expanduser(self.file_path))
+        self.schema = None
         self.update_group()
         self.show_row()
 
