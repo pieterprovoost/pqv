@@ -26,8 +26,11 @@ class ParquetApp(App[str]):
         self.group = self.parquet_file.read_row_group(self.group_index, columns=None).to_pandas()
 
     def read_line(self):
-        row = self.group.iloc[self.row_index - self.group_offset, ]
-        return row.to_json(indent=2)
+        if self.row_index - self.group_offset < len(self.group):
+            row = self.group.iloc[self.row_index - self.group_offset, ]
+            return row.to_json(indent=2)
+        else:
+            return None
 
     def show_row(self):
         info_view = self.query_one("#info", Static)
@@ -36,7 +39,10 @@ class ParquetApp(App[str]):
 
         json_view = self.query_one("#json", Static)
         row = self.read_line()
-        syntax = Syntax(row, "json", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+        if row is not None:
+            syntax = Syntax(row, "json", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+        else:
+            syntax = Syntax("", "text", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
         json_view.update(syntax)
 
     def toggle_schema(self):
