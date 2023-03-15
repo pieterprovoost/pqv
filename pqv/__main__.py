@@ -5,6 +5,7 @@ from rich.syntax import Syntax
 from textual.app import App, ComposeResult
 from textual.widgets import Static, Footer
 from textual import events
+import pyperclip
 
 
 class ParquetApp(App[str]):
@@ -15,6 +16,7 @@ class ParquetApp(App[str]):
         ("←", "previous", "Previous"),
         ("→", "next", "Next"),
         ("s", "schema", "Schema"),
+        ("c", "copy", "Copy"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -41,8 +43,10 @@ class ParquetApp(App[str]):
         row = self.read_line()
         if row is not None:
             syntax = Syntax(row, "json", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            self.content = row
         else:
             syntax = Syntax("", "text", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            self.content = ""
         json_view.update(syntax)
 
     def toggle_schema(self):
@@ -50,6 +54,7 @@ class ParquetApp(App[str]):
             json_view = self.query_one("#json", Static)
             self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
             syntax = Syntax(self.schema, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            self.content = self.schema
             json_view.update(syntax)
         else:
             self.schema = None
@@ -72,6 +77,9 @@ class ParquetApp(App[str]):
                 self.update_group()
             self.show_row()
 
+    def copy(self):
+        pyperclip.copy(self.content)
+
     def on_key(self, event: events.Key) -> None:
         if event.key == "left":
             self.previous()
@@ -79,6 +87,8 @@ class ParquetApp(App[str]):
             self.next()
         elif event.key == "s":
             self.toggle_schema()
+        elif event.key == "c":
+            self.copy()
 
     def on_mount(self) -> None:
         self.group = None
