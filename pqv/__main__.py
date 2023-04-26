@@ -96,7 +96,12 @@ class ParquetApp(App[str]):
         self.group_offset = 0
         self.row_index = 0
         self.file_path = sys.argv[1]
-        self.parquet_file = ParquetFile(os.path.expanduser(self.file_path))
+        if not os.path.isfile(self.file_path):
+            sys.exit(f"No such file: {self.file_path}")
+        try:
+            self.parquet_file = ParquetFile(os.path.expanduser(self.file_path))
+        except Exception:
+            sys.exit(f"Error reading file {self.file_path}")
         self.schema = None
         self.update_group()
         self.show_row()
