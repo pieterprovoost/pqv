@@ -6,6 +6,17 @@ from textual.app import App, ComposeResult
 from textual.widgets import Static, Footer
 from textual import events
 import pyperclip
+import json
+from datetime import datetime
+
+
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return str(obj)
+        if isinstance(obj, bytes):
+            return obj.hex()
+        return super(CustomEncoder, self).default(obj)
 
 
 class ParquetApp(App[str]):
@@ -25,12 +36,13 @@ class ParquetApp(App[str]):
         yield Footer()
 
     def update_group(self):
-        self.group = self.parquet_file.read_row_group(self.group_index, columns=None).to_pandas()
+        self.group = self.parquet_file.read_row_group(self.group_index, columns=None)
 
     def read_line(self):
         if self.row_index - self.group_offset < len(self.group):
-            row = self.group.iloc[self.row_index - self.group_offset, ]
-            return row.to_json(indent=2)
+            row_dict = dict([(k, v[0]) for k, v in self.group.slice(self.row_index - self.group_offset, 1).to_pydict().items()])
+            json_str = json.dumps(row_dict, indent=2, cls=CustomEncoder)
+            return json_str
         else:
             return None
 
