@@ -47,6 +47,7 @@ class ParquetApp(App[str]):
             return None
 
     def show_row(self):
+        self.state = "row"
         info_view = self.query_one("#info", Static)
         info = f"{self.file_path} - group {self.group_index + 1}/{self.parquet_file.num_row_groups} - row {self.row_index + 1}/{self.parquet_file.metadata.num_rows}"
         info_view.update(info)
@@ -62,14 +63,13 @@ class ParquetApp(App[str]):
         json_view.update(syntax)
 
     def toggle_schema(self):
-        if self.schema is None:
+        if self.state != "schema":
+            self.state = "schema"
             json_view = self.query_one("#json", Static)
-            self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
             syntax = Syntax(self.schema, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
             self.content = self.schema
             json_view.update(syntax)
         else:
-            self.schema = None
             self.show_row()
 
     def previous(self):
@@ -108,13 +108,14 @@ class ParquetApp(App[str]):
         self.group_offset = 0
         self.row_index = 0
         self.file_path = sys.argv[1]
+        self.state = "row"
         if not os.path.isfile(self.file_path):
             sys.exit(f"No such file: {self.file_path}")
         try:
             self.parquet_file = ParquetFile(os.path.expanduser(self.file_path))
         except Exception:
             sys.exit(f"Error reading file {self.file_path}")
-        self.schema = None
+        self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
         self.update_group()
         self.show_row()
 
