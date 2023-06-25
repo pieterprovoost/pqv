@@ -10,6 +10,14 @@ import json
 from datetime import datetime
 
 
+def parse_if_json(input: str):
+    try:
+        parsed = json.loads(input)
+        return parsed
+    except ValueError:
+        return input
+
+
 class CustomEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):
@@ -27,6 +35,7 @@ class ParquetApp(App[str]):
         ("←", "previous", "Previous"),
         ("→", "next", "Next"),
         ("s", "schema", "Schema"),
+        ("m", "metadata", "Metadata"),
         ("c", "copy", "Copy"),
     ]
 
@@ -72,6 +81,16 @@ class ParquetApp(App[str]):
         else:
             self.show_row()
 
+    def toggle_metadata(self):
+        if self.state != "metadata":
+            self.state = "metadata"
+            json_view = self.query_one("#json", Static)
+            syntax = Syntax(self.metadata, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            self.content = self.metadata
+            json_view.update(syntax)
+        else:
+            self.show_row()
+
     def previous(self):
         self.row_index = self.row_index - 1 if self.row_index > 0 else 0
         if self.row_index < self.group_offset:
@@ -99,6 +118,8 @@ class ParquetApp(App[str]):
             self.next()
         elif event.key == "s":
             self.toggle_schema()
+        elif event.key == "m":
+            self.toggle_metadata()
         elif event.key == "c":
             self.copy()
 
@@ -116,6 +137,10 @@ class ParquetApp(App[str]):
         except Exception:
             sys.exit(f"Error reading file {self.file_path}")
         self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
+        if self.parquet_file.metadata.metadata is not None:
+            self.metadata = json.dumps({k.decode(): parse_if_json(v.decode()) for k, v in self.parquet_file.metadata.metadata.items()}, indent=2)
+        else:
+            self.metadata = ""
         self.update_group()
         self.show_row()
 
