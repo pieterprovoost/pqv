@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pqv",
-    version="0.6.0",
+    version="0.6.1",
     author="Pieter Provoost",
     author_email="pieterprovoost@gmail.com",
     description="Simple parquet viewer",
@@ -19,4 +19,9 @@ setup(
             "pqv = pqv.__main__:main"
         ]
     },
+    install_requires=[
+        "pyarrow",
+        "textual",
+        "pyperclip"
+    ]
 )
