@@ -34,6 +34,7 @@ class ParquetApp(App[str]):
         ("q", "quit", "Quit"),
         ("←", "previous", "Previous"),
         ("→", "next", "Next"),
+        ("⇧", "shift", "Group"),
         ("s", "schema", "Schema"),
         ("m", "metadata", "Metadata"),
         ("c", "copy", "Copy"),
@@ -108,6 +109,24 @@ class ParquetApp(App[str]):
                 self.update_group()
             self.show_row()
 
+    def next_group(self):
+        if self.group_index < self.parquet_file.metadata.num_row_groups - 1:
+            self.group_index = self.group_index + 1
+            self.group_offset = self.group_offset + self.group.shape[0]
+            self.row_index = self.group_offset
+        else:
+            self.row_index = self.parquet_file.metadata.num_rows - 1
+        self.update_group()
+        self.show_row()
+
+    def previous_group(self):
+        if self.group_index > 0:
+            self.group_index = self.group_index - 1
+            self.group_offset = self.group_offset - self.group.shape[0] # TODO: fix, this should use the size of the previous group
+        self.row_index = self.group_offset
+        self.update_group()
+        self.show_row()
+
     def copy(self):
         pyperclip.copy(self.content)
 
@@ -116,6 +135,10 @@ class ParquetApp(App[str]):
             self.previous()
         elif event.key == "right":
             self.next()
+        elif event.key == "shift+left":
+            self.previous_group()
+        elif event.key == "shift+right":
+            self.next_group()
         elif event.key == "s":
             self.toggle_schema()
         elif event.key == "m":
