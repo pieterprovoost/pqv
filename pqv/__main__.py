@@ -27,6 +27,79 @@ class CustomEncoder(json.JSONEncoder):
         return super(CustomEncoder, self).default(obj)
 
 
+class ParquetReader:
+
+    def __init__(self, file_path: str):
+
+        if not os.path.isfile(file_path):
+            sys.exit(f"No such file: {file_path}")
+        try:
+            self.parquet_file = ParquetFile(os.path.expanduser(file_path))
+        except Exception:
+            sys.exit(f"Error reading file {file_path}")
+
+        self.file_path = file_path
+        self.group_stack = []
+        self.group = None
+        self.row_index = 0
+        self.group_offset = 0
+
+        self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
+        if self.parquet_file.metadata.metadata is not None:
+            self.metadata = json.dumps({k.decode(): parse_if_json(v.decode()) for k, v in self.parquet_file.metadata.metadata.items()}, indent=2)
+        else:
+            self.metadata = ""
+
+        self.read_group()
+
+    def group_index(self):
+        return len(self.group_stack)
+
+    def read_group(self):
+        self.group = self.parquet_file.read_row_group(len(self.group_stack), columns=None)
+
+    def read_line(self):
+        if self.row_index - self.group_offset < len(self.group):
+            row_dict = dict([(k, v[0]) for k, v in self.group.slice(self.row_index - self.group_offset, 1).to_pydict().items()])
+            json_str = json.dumps(row_dict, indent=2, cls=CustomEncoder)
+            return json_str
+        else:
+            return None
+
+    def check_group_needs_update(self):
+        if self.row_index < self.group_offset:
+            shape = self.group_stack.pop()
+            self.read_group()
+            self.group_offset = self.group_offset - shape
+        elif self.row_index >= self.group_offset + self.group.shape[0]:
+            self.group_stack.append(self.group.shape[0])
+            self.group_offset = self.group_offset + self.group.shape[0]
+            self.read_group()
+
+    def previous(self):
+        self.set_row(self.row_index - 1 if self.row_index > 0 else 0)
+
+    def next(self):
+        if self.row_index < self.parquet_file.metadata.num_rows - 1:
+            self.set_row(self.row_index + 1)
+
+    def next_group(self):
+        if self.group_index() < self.parquet_file.metadata.num_row_groups - 1:
+            self.set_row(self.group_offset + self.group.shape[0])
+        else:
+            self.set_row(self.parquet_file.metadata.num_rows - 1)
+
+    def previous_group(self):
+        if self.group_index() > 0:
+            self.set_row(self.group_offset - self.group_stack[~0])
+        else:
+            self.set_row(0)
+
+    def set_row(self, row_index: int):
+        self.row_index = row_index
+        self.check_group_needs_update()
+
+
 class ParquetApp(App[str]):
 
     CSS_PATH = "style.css"
@@ -45,25 +118,13 @@ class ParquetApp(App[str]):
         yield Static(id="json")
         yield Footer()
 
-    def update_group(self):
-        self.group = self.parquet_file.read_row_group(self.group_index, columns=None)
-
-    def read_line(self):
-        if self.row_index - self.group_offset < len(self.group):
-            row_dict = dict([(k, v[0]) for k, v in self.group.slice(self.row_index - self.group_offset, 1).to_pydict().items()])
-            json_str = json.dumps(row_dict, indent=2, cls=CustomEncoder)
-            return json_str
-        else:
-            return None
-
     def show_row(self):
-        self.state = "row"
         info_view = self.query_one("#info", Static)
-        info = f"{self.file_path} - group {self.group_index + 1}/{self.parquet_file.num_row_groups} - row {self.row_index + 1}/{self.parquet_file.metadata.num_rows}"
+        info = f"{self.reader.file_path} - group {self.reader.group_index() + 1}/{self.reader.parquet_file.num_row_groups} - row {self.reader.row_index + 1}/{self.reader.parquet_file.metadata.num_rows}"
         info_view.update(info)
 
         json_view = self.query_one("#json", Static)
-        row = self.read_line()
+        row = self.reader.read_line()
         if row is not None:
             syntax = Syntax(row, "json", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
             self.content = row
@@ -92,43 +153,24 @@ class ParquetApp(App[str]):
         else:
             self.show_row()
 
+    def copy(self):
+        pyperclip.copy(self.content)
+
     def previous(self):
-        self.row_index = self.row_index - 1 if self.row_index > 0 else 0
-        if self.row_index < self.group_offset:
-            self.group_index = self.group_index - 1
-            self.group_offset = self.group_offset - self.group.shape[0]
-            self.update_group()
+        self.reader.previous()
         self.show_row()
 
     def next(self):
-        if self.row_index < self.parquet_file.metadata.num_rows - 1:
-            self.row_index = self.row_index + 1
-            if self.row_index >= self.group_offset + self.group.shape[0]:
-                self.group_index = self.group_index + 1
-                self.group_offset = self.group_offset + self.group.shape[0]
-                self.update_group()
-            self.show_row()
-
-    def next_group(self):
-        if self.group_index < self.parquet_file.metadata.num_row_groups - 1:
-            self.group_index = self.group_index + 1
-            self.group_offset = self.group_offset + self.group.shape[0]
-            self.row_index = self.group_offset
-        else:
-            self.row_index = self.parquet_file.metadata.num_rows - 1
-        self.update_group()
+        self.reader.next()
         self.show_row()
 
     def previous_group(self):
-        if self.group_index > 0:
-            self.group_index = self.group_index - 1
-            self.group_offset = self.group_offset - self.group.shape[0] # TODO: fix, this should use the size of the previous group
-        self.row_index = self.group_offset
-        self.update_group()
+        self.reader.previous_group()
         self.show_row()
 
-    def copy(self):
-        pyperclip.copy(self.content)
+    def next_group(self):
+        self.reader.next_group()
+        self.show_row()
 
     def on_key(self, event: events.Key) -> None:
         if event.key == "left":
@@ -147,26 +189,10 @@ class ParquetApp(App[str]):
             self.copy()
 
     def on_mount(self) -> None:
-        self.group = None
-        self.group_index = 0
-        self.group_offset = 0
-        self.row_index = 0
-        self.file_path = sys.argv[1]
-        self.state = "row"
-        if not os.path.isfile(self.file_path):
-            sys.exit(f"No such file: {self.file_path}")
-        try:
-            self.parquet_file = ParquetFile(os.path.expanduser(self.file_path))
-        except Exception:
-            sys.exit(f"Error reading file {self.file_path}")
-        self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
-        if self.parquet_file.metadata.metadata is not None:
-            self.metadata = json.dumps({k.decode(): parse_if_json(v.decode()) for k, v in self.parquet_file.metadata.metadata.items()}, indent=2)
-        else:
-            self.metadata = ""
-        self.update_group()
+    
+        self.reader = ParquetReader(sys.argv[1])
         self.show_row()
-
+    
 
 def main():
     app = ParquetApp()
