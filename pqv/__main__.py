@@ -137,8 +137,8 @@ class ParquetApp(App[str]):
         if self.state != "schema":
             self.state = "schema"
             json_view = self.query_one("#json", Static)
-            syntax = Syntax(self.schema, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
-            self.content = self.schema
+            syntax = Syntax(self.reader.schema, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            self.content = self.reader.schema
             json_view.update(syntax)
         else:
             self.show_row()
@@ -147,8 +147,8 @@ class ParquetApp(App[str]):
         if self.state != "metadata":
             self.state = "metadata"
             json_view = self.query_one("#json", Static)
-            syntax = Syntax(self.metadata, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
-            self.content = self.metadata
+            syntax = Syntax(self.reader.metadata, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            self.content = self.reader.metadata
             json_view.update(syntax)
         else:
             self.show_row()
@@ -191,6 +191,7 @@ class ParquetApp(App[str]):
     def on_mount(self) -> None:
     
         self.reader = ParquetReader(sys.argv[1])
+        self.state = "row"
         self.show_row()
     
 
