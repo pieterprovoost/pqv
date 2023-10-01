@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pqv",
-    version="0.6.1",
+    version="0.7.0",
     author="Pieter Provoost",
     author_email="pieterprovoost@gmail.com",
     description="Simple parquet viewer",
