@@ -43,6 +43,7 @@ class ParquetReader:
         self.group = None
         self.row_index = 0
         self.group_offset = 0
+        self.row_group = ""
 
         self.schema = "\n".join(str(self.parquet_file.schema).splitlines(keepends=False)[1:])
         if self.parquet_file.metadata.metadata is not None:
@@ -56,7 +57,10 @@ class ParquetReader:
         return len(self.group_stack)
 
     def read_group(self):
-        self.group = self.parquet_file.read_row_group(len(self.group_stack), columns=None)
+        row_group_index = len(self.group_stack)
+        self.group = self.parquet_file.read_row_group(row_group_index, columns=None)
+        row_group_info = self.parquet_file.metadata.row_group(row_group_index)
+        self.row_group_info = json.dumps(row_group_info.to_dict(), indent=2, cls=CustomEncoder)
 
     def read_line(self):
         if self.row_index - self.group_offset < len(self.group):
@@ -110,6 +114,7 @@ class ParquetApp(App[str]):
         ("⇧", "shift", "Group"),
         ("s", "schema", "Schema"),
         ("m", "metadata", "Metadata"),
+        ("r", "rgmetadata", "Group metadata"),
         ("c", "copy", "Copy"),
     ]
 
@@ -119,6 +124,7 @@ class ParquetApp(App[str]):
         yield Footer()
 
     def show_row(self):
+        self.state = "row"
         info_view = self.query_one("#info", Static)
         info = f"{self.reader.file_path} - group {self.reader.group_index() + 1}/{self.reader.parquet_file.num_row_groups} - row {self.reader.row_index + 1}/{self.reader.parquet_file.metadata.num_rows}"
         info_view.update(info)
@@ -149,6 +155,16 @@ class ParquetApp(App[str]):
             json_view = self.query_one("#json", Static)
             syntax = Syntax(self.reader.metadata, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
             self.content = self.reader.metadata
+            json_view.update(syntax)
+        else:
+            self.show_row()
+
+    def toggle_row_group_info(self):
+        if self.state != "rowgroup":
+            self.state = "rowgroup"
+            json_view = self.query_one("#json", Static)
+            syntax = Syntax(self.reader.row_group_info, "yaml", theme="github-dark", line_numbers=True, word_wrap=False, indent_guides=True)
+            self.content = self.reader.row_group_info
             json_view.update(syntax)
         else:
             self.show_row()
@@ -185,13 +201,14 @@ class ParquetApp(App[str]):
             self.toggle_schema()
         elif event.key == "m":
             self.toggle_metadata()
+        elif event.key == "g":
+            self.toggle_row_group_info()
         elif event.key == "c":
             self.copy()
 
     def on_mount(self) -> None:
     
         self.reader = ParquetReader(sys.argv[1])
-        self.state = "row"
         self.show_row()
     
 
