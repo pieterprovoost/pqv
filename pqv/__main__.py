@@ -114,7 +114,7 @@ class ParquetApp(App[str]):
         ("⇧", "shift", "Group"),
         ("s", "schema", "Schema"),
         ("m", "metadata", "Metadata"),
-        ("r", "rgmetadata", "Group metadata"),
+        ("g", "rgmetadata", "Group metadata"),
         ("c", "copy", "Copy"),
     ]
 
