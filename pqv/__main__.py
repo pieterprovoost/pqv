@@ -4,6 +4,7 @@ from pyarrow.parquet import ParquetFile
 from rich.syntax import Syntax
 from textual.app import App, ComposeResult
 from textual.widgets import Static, Footer
+from textual.binding import Binding
 from textual import events
 import pyperclip
 import json
@@ -108,14 +109,14 @@ class ParquetApp(App[str]):
 
     CSS_PATH = "style.css"
     BINDINGS = [
-        ("q", "quit", "Quit"),
-        ("←", "previous", "Previous"),
-        ("→", "next", "Next"),
-        ("⇧", "shift", "Group"),
-        ("s", "schema", "Schema"),
-        ("m", "metadata", "Metadata"),
-        ("g", "rgmetadata", "Group metadata"),
-        ("c", "copy", "Copy"),
+        Binding("q", "quit", "Quit"),
+        Binding("←", "previous", "Previous", key_display="←"),
+        Binding("→", "next", "Next", key_display="→"),
+        Binding("⇧", "shift", "Group", key_display="⇧"),
+        Binding("s", "schema", "Schema"),
+        Binding("m", "metadata", "Metadata"),
+        Binding("g", "rgmetadata", "Group metadata"),
+        Binding("c", "copy", "Copy"),
     ]
 
     def compose(self) -> ComposeResult:
