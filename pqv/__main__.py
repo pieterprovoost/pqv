@@ -121,7 +121,7 @@ class ParquetApp(App[str]):
     def compose(self) -> ComposeResult:
         yield Static(id="info")
         yield Static(id="json")
-        yield Footer()
+        yield Footer(show_command_palette=False)
 
     def show_row(self):
         self.state = "row"
